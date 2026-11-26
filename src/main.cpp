@@ -12708,7 +12708,7 @@ class $modify(BufPlayLayer, PlayLayer) {
         finishDrift(" (died)");
     }
 
-    bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
+    bool init(GJGameLevel* level, bool dontCreateObjects) {  // 2.2091: useReplay was removed
         // v2.99.6: the last level was replaced without being quit (seen with Versus, which
         // opens levels on its own). Its nodes are already freed, and the new level can even
         // be created at the same address, so `buf.owner == this` matched during loading and
@@ -12717,7 +12717,7 @@ class $modify(BufPlayLayer, PlayLayer) {
         if (buf.owner) {
             forgetLeftLevel();
         }
-        if (!PlayLayer::init(level, useReplay, dontCreateObjects)) {
+        if (!PlayLayer::init(level, dontCreateObjects)) {
             return false;
         }
         dropGhosts();
