@@ -17,6 +17,7 @@
 
 #include <set>
 #include <Geode/Geode.hpp>
+#include <asp/fs/std.hpp>  // Geode v6: Mod::getSaveDir()/getConfigDir() return asp::fs::Path
 #include <Geode/utils/web.hpp>
 #include <Geode/modify/EffectGameObject.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -933,8 +934,8 @@ namespace {
 
         bool copied = geode::utils::clipboard::write(text);
         std::error_code ec;
-        std::filesystem::create_directories(mod->getSaveDir(), ec);
-        std::ofstream(mod->getSaveDir() / "console-export.txt", std::ios::trunc) << text;
+        std::filesystem::create_directories(mod->getSaveDir().toStdPath(), ec);
+        std::ofstream(mod->getSaveDir().toStdPath() / "console-export.txt", std::ios::trunc) << text;
         say("console {} ({} lines) + saved to console-export.txt", copied ? "copied to clipboard" : "NOT copied", exportLines.size());
     }
 
@@ -1205,8 +1206,6 @@ namespace {
         ghost->m_affectedByForces = real->m_affectedByForces;
         ghost->m_stateBoostX = real->m_stateBoostX;
         ghost->m_stateBoostY = real->m_stateBoostY;
-        ghost->m_stateNoStickX = real->m_stateNoStickX;
-        ghost->m_stateNoStickY = real->m_stateNoStickY;
         ghost->m_stateHitHead = real->m_stateHitHead;
         ghost->m_stateFlipGravity = real->m_stateFlipGravity;
         ghost->m_stateNoAutoJump = real->m_stateNoAutoJump;
@@ -2374,7 +2373,7 @@ namespace {
     std::filesystem::path memoryFile() {
         // v2.37: slices keyed by the real position. v2.75: _v3, a fresh start after the
         // prediction fixes of v2.61-v2.74 (old files learned from the buggy versions)
-        return Mod::get()->getSaveDir() / "memory" / (memoryKey + "_v3.txt");
+        return Mod::get()->getSaveDir().toStdPath() / "memory" / (memoryKey + "_v3.txt");
     }
 
     size_t memorySpots() {
@@ -2648,7 +2647,7 @@ namespace {
 
     // v3.0 test 27: the level index's objects near a hidden player that GD didn't give it this step
     void injectOffscreen(PlayLayer* layer, PlayerObject* ghost, float dt) {
-        static gd::vector<GameObject*> extra;
+        static std::vector<GameObject*> extra;
         extra.clear();
         auto pos = ghost->getPosition();
         int b = static_cast<int>(std::floor(pos.x / 64.f));
@@ -4077,7 +4076,7 @@ namespace {
     std::string lastBench;        // last result, for the stats popup
 
     std::filesystem::path benchFile() {
-        return Mod::get()->getSaveDir() / "bench" / (memoryKey + ".txt");
+        return Mod::get()->getSaveDir().toStdPath() / "bench" / (memoryKey + ".txt");
     }
 
     size_t benchSavedTicks() {
@@ -4244,8 +4243,8 @@ namespace {
         say("run check: {} | max error {:.1f}u{} | {:.0f} ms", lastBench, maxErr,
             std::abs(r.dt - buf.tickLength) > 1e-4f ? " | recorded at another frame rate" : "", ms);
         std::error_code ec;
-        std::filesystem::create_directories(Mod::get()->getSaveDir(), ec);
-        std::ofstream(Mod::get()->getSaveDir() / "run-check-results.txt", std::ios::app)
+        std::filesystem::create_directories(Mod::get()->getSaveDir().toStdPath(), ec);
+        std::ofstream(Mod::get()->getSaveDir().toStdPath() / "run-check-results.txt", std::ios::app)
             << Mod::get()->getVersion().toVString() << ' ' << memoryKey << ": " << lastBench << '\n';
     }
 
@@ -5309,7 +5308,7 @@ namespace online {
     }
 
     std::filesystem::path autoplayFile() {
-        return Mod::get()->getSaveDir() / "autoplay" / (autoplay.saveKey + ".txt");
+        return Mod::get()->getSaveDir().toStdPath() / "autoplay" / (autoplay.saveKey + ".txt");
     }
 
     void autoplayKey(PlayLayer* layer) {
@@ -5485,7 +5484,7 @@ namespace online {
     };
 
     std::filesystem::path macroDir() {
-        return Mod::get()->getConfigDir() / "macros";
+        return Mod::get()->getConfigDir().toStdPath() / "macros";
     }
 
     struct Macro {
@@ -13044,7 +13043,7 @@ class $modify(BufEffectGameObject, EffectGameObject) {
         (void)self.setHookPriority("EffectGameObject::triggerObject", HOOK_PRIORITY);
     }
 
-    void triggerObject(GJBaseGameLayer* layer, int uniqueID, gd::vector<int> const* remapKeys) {
+    void triggerObject(GJBaseGameLayer* layer, int uniqueID, std::vector<int> const* remapKeys) {
         if (buf.simulating) {
             return;
         }
@@ -13880,12 +13879,12 @@ class $modify(BufBaseGameLayer, GJBaseGameLayer) {
         return GJBaseGameLayer::canBeActivatedByPlayer(player, object);
     }
 
-    void collisionCheckObjects(PlayerObject* player, gd::vector<GameObject*>* objects, int objectCount, float dt) {
+    void collisionCheckObjects(PlayerObject* player, std::vector<GameObject*>* objects, int objectCount, float dt) {
         if (!buf.simulating) {
             GJBaseGameLayer::collisionCheckObjects(player, objects, objectCount, dt);
             return;
         }
-        static gd::vector<GameObject*> relevant;
+        static std::vector<GameObject*> relevant;
         relevant.clear();
         if (static_cast<int>(relevant.capacity()) < objectCount) {
             relevant.reserve(objectCount);
@@ -14134,7 +14133,7 @@ class $modify(BufBaseGameLayer, GJBaseGameLayer) {
     // Toggle orbs, orbs / pads / collectibles with groups, item and counter triggers could
     // otherwise toggle or spawn groups and change item counters for real (once per
     // prediction run, many times a click), which broke triggers in some levels.
-    void toggleGroupTriggered(int group, bool activate, gd::vector<int> const& remapKeys, int triggerID, int controlID) {
+    void toggleGroupTriggered(int group, bool activate, std::vector<int> const& remapKeys, int triggerID, int controlID) {
         if (buf.simulating) {
             // v2.75: a toggle orb that switches a group off: the ghost stops colliding with
             // that group for the rest of this prediction (the real objects aren't touched)
@@ -14147,7 +14146,7 @@ class $modify(BufBaseGameLayer, GJBaseGameLayer) {
         GJBaseGameLayer::toggleGroupTriggered(group, activate, remapKeys, triggerID, controlID);
     }
 
-    void spawnGroup(int group, bool ordered, double delay, gd::vector<int> const& remapKeys, int triggerID, int controlID) {
+    void spawnGroup(int group, bool ordered, double delay, std::vector<int> const& remapKeys, int triggerID, int controlID) {
         if (buf.simulating) {
             return;
         }
@@ -14187,7 +14186,7 @@ class $modify(BufBaseGameLayer, GJBaseGameLayer) {
         GJBaseGameLayer::activateItemEditTrigger(object);
     }
 
-    void activateItemCompareTrigger(ItemTriggerGameObject* object, gd::vector<int> const& remapKeys) {
+    void activateItemCompareTrigger(ItemTriggerGameObject* object, std::vector<int> const& remapKeys) {
         if (buf.simulating) {
             return;
         }
