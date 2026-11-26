@@ -934,8 +934,8 @@ namespace {
 
         bool copied = geode::utils::clipboard::write(text);
         std::error_code ec;
-        std::filesystem::create_directories(mod->getSaveDir().toStdPath(), ec);
-        std::ofstream(mod->getSaveDir().toStdPath() / "console-export.txt", std::ios::trunc) << text;
+        std::filesystem::create_directories(mod->getSaveDir().toStdPath().unwrapOrDefault(), ec);
+        std::ofstream(mod->getSaveDir().toStdPath().unwrapOrDefault() / "console-export.txt", std::ios::trunc) << text;
         say("console {} ({} lines) + saved to console-export.txt", copied ? "copied to clipboard" : "NOT copied", exportLines.size());
     }
 
@@ -2373,7 +2373,7 @@ namespace {
     std::filesystem::path memoryFile() {
         // v2.37: slices keyed by the real position. v2.75: _v3, a fresh start after the
         // prediction fixes of v2.61-v2.74 (old files learned from the buggy versions)
-        return Mod::get()->getSaveDir().toStdPath() / "memory" / (memoryKey + "_v3.txt");
+        return Mod::get()->getSaveDir().toStdPath().unwrapOrDefault() / "memory" / (memoryKey + "_v3.txt");
     }
 
     size_t memorySpots() {
@@ -4076,7 +4076,7 @@ namespace {
     std::string lastBench;        // last result, for the stats popup
 
     std::filesystem::path benchFile() {
-        return Mod::get()->getSaveDir().toStdPath() / "bench" / (memoryKey + ".txt");
+        return Mod::get()->getSaveDir().toStdPath().unwrapOrDefault() / "bench" / (memoryKey + ".txt");
     }
 
     size_t benchSavedTicks() {
@@ -4243,8 +4243,8 @@ namespace {
         say("run check: {} | max error {:.1f}u{} | {:.0f} ms", lastBench, maxErr,
             std::abs(r.dt - buf.tickLength) > 1e-4f ? " | recorded at another frame rate" : "", ms);
         std::error_code ec;
-        std::filesystem::create_directories(Mod::get()->getSaveDir().toStdPath(), ec);
-        std::ofstream(Mod::get()->getSaveDir().toStdPath() / "run-check-results.txt", std::ios::app)
+        std::filesystem::create_directories(Mod::get()->getSaveDir().toStdPath().unwrapOrDefault(), ec);
+        std::ofstream(Mod::get()->getSaveDir().toStdPath().unwrapOrDefault() / "run-check-results.txt", std::ios::app)
             << Mod::get()->getVersion().toVString() << ' ' << memoryKey << ": " << lastBench << '\n';
     }
 
@@ -4966,7 +4966,7 @@ namespace online {
             while (true) {
                 if (Mod::get()->getSettingValue<bool>("online-players")) {
                     auto res = web::WebRequest()
-                        .timeout(std::chrono::seconds(10))
+                        .timeout(asp::Duration::fromSecs(10))
                         .userAgent("ClickBeforeFrames")
                         .header("Content-Type", "application/json")
                         .bodyString(body)
@@ -5025,7 +5025,7 @@ namespace online {
             }
             std::string url = fmt::format("{}/api/account?id={}", online::URL, online::id());
             std::thread([url] {
-                auto res = web::WebRequest().timeout(std::chrono::seconds(15)).userAgent("ClickBeforeFrames").getSync(url);
+                auto res = web::WebRequest().timeout(asp::Duration::fromSecs(15)).userAgent("ClickBeforeFrames").getSync(url);
                 Stats st;
                 if (res.ok()) {
                     if (auto j = res.json(); j.isOk()) {
@@ -5069,7 +5069,7 @@ namespace online {
             dirty = true;
             std::string body = fmt::format(R"({{"id":"{}"}})", online::id());
             std::thread([body] {
-                auto res = web::WebRequest().timeout(std::chrono::seconds(15)).userAgent("ClickBeforeFrames").header("Content-Type", "application/json")
+                auto res = web::WebRequest().timeout(asp::Duration::fromSecs(15)).userAgent("ClickBeforeFrames").header("Content-Type", "application/json")
                     .bodyString(body).postSync(std::string(online::URL) + "/api/link/start");
                 std::string c, url;
                 if (res.ok()) {
@@ -5094,7 +5094,7 @@ namespace online {
                 });
                 for (int i = 0; i < 200; ++i) {
                     std::this_thread::sleep_for(std::chrono::seconds(3));
-                    auto p = web::WebRequest().timeout(std::chrono::seconds(10)).userAgent("ClickBeforeFrames")
+                    auto p = web::WebRequest().timeout(asp::Duration::fromSecs(10)).userAgent("ClickBeforeFrames")
                         .getSync(fmt::format("{}/api/link/poll?code={}", online::URL, c));
                     if (!p.ok()) {
                         continue;
@@ -5308,7 +5308,7 @@ namespace online {
     }
 
     std::filesystem::path autoplayFile() {
-        return Mod::get()->getSaveDir().toStdPath() / "autoplay" / (autoplay.saveKey + ".txt");
+        return Mod::get()->getSaveDir().toStdPath().unwrapOrDefault() / "autoplay" / (autoplay.saveKey + ".txt");
     }
 
     void autoplayKey(PlayLayer* layer) {
@@ -5484,7 +5484,7 @@ namespace online {
     };
 
     std::filesystem::path macroDir() {
-        return Mod::get()->getConfigDir().toStdPath() / "macros";
+        return Mod::get()->getConfigDir().toStdPath().unwrapOrDefault() / "macros";
     }
 
     struct Macro {
@@ -6039,7 +6039,7 @@ namespace online {
 
     // the page's data: <script data-page="app" type="application/json">{...}</script>
     std::optional<matjson::Value> hyperbolusPage(std::string const& url) {
-        auto res = web::WebRequest().timeout(std::chrono::seconds(20)).userAgent("ClickBeforeFrames").getSync(url);
+        auto res = web::WebRequest().timeout(asp::Duration::fromSecs(20)).userAgent("ClickBeforeFrames").getSync(url);
         if (!res.ok()) {
             return std::nullopt;
         }
@@ -6083,7 +6083,7 @@ namespace online {
             for (int page = 1; page <= std::min(last, 8); ++page) {
                 // test 71: Hyperbolus's own API (the level page's data before)
                 std::optional<matjson::Value> data;
-                auto api = web::WebRequest().timeout(std::chrono::seconds(20)).userAgent("ClickBeforeFrames")
+                auto api = web::WebRequest().timeout(asp::Duration::fromSecs(20)).userAgent("ClickBeforeFrames")
                     .getSync(fmt::format("https://hyperbolus.net/api/macros?level_id={}&format=gdr&page={}", levelId, page));
                 if (api.ok()) {
                     if (auto j = api.json(); j.isOk()) {
@@ -6144,7 +6144,7 @@ namespace online {
                 };
                 std::string want = norm(levelName);
                 std::string base = "https://raw.githubusercontent.com/downupstudio/macrodash/main/";
-                auto idx = web::WebRequest().timeout(std::chrono::seconds(15)).userAgent("ClickBeforeFrames").getSync(base + "macros-data.js");
+                auto idx = web::WebRequest().timeout(asp::Duration::fromSecs(15)).userAgent("ClickBeforeFrames").getSync(base + "macros-data.js");
                 if (idx.ok() && !want.empty()) {
                     std::string js = idx.string().unwrapOr("");
                     auto field = [](std::string const& chunk, std::string const& key) -> std::string {
@@ -6183,7 +6183,7 @@ namespace online {
                         q += fmt::format("%{:02X}", c);
                     }
                 }
-                auto res = web::WebRequest().timeout(std::chrono::seconds(15)).userAgent("ClickBeforeFrames")
+                auto res = web::WebRequest().timeout(asp::Duration::fromSecs(15)).userAgent("ClickBeforeFrames")
                     .getSync(fmt::format("https://astral-api.gwddos.workers.dev/api/macros?page=1&limit=50&search={}", q));
                 if (res.ok()) {
                     if (auto j = res.json(); j.isOk() && j.unwrap()["macros"].isArray()) {
@@ -6238,7 +6238,7 @@ namespace online {
                     ++skippedBad;
                     continue;
                 }
-                auto file = web::WebRequest().timeout(std::chrono::seconds(60)).userAgent("ClickBeforeFrames").followRedirects(true).getSync(o.url);
+                auto file = web::WebRequest().timeout(asp::Duration::fromSecs(60)).userAgent("ClickBeforeFrames").followRedirects(true).getSync(o.url);
                 if (!file.ok()) {
                     continue;
                 }
@@ -6294,7 +6294,7 @@ namespace online {
                 std::filesystem::create_directories(dir, ec);
                 std::filesystem::remove(dir / fmt::format("{}.gdr", levelId), ec);
                 std::filesystem::remove(dir / fmt::format("{}.gdr.json", levelId), ec);
-                (void)file::writeBinarySafe(path, ByteSpan(best.data));
+                (void)file::writeBinarySafe(asp::fs::Path::fromStdPath(path), ByteSpan(best.data));
                 if (best.m.author.empty()) {
                     best.m.author = best.o.author;
                 }
@@ -6346,7 +6346,7 @@ namespace online {
     std::vector<MacroChoice> listMacroChoices(int levelId, std::string const& levelName, std::string const& print, int myTps) {
         std::vector<MacroChoice> out;
         auto get = [](std::string const& url) {
-            return web::WebRequest().timeout(std::chrono::seconds(15)).userAgent("ClickBeforeFrames").followRedirects(true).getSync(url);
+            return web::WebRequest().timeout(asp::Duration::fromSecs(15)).userAgent("ClickBeforeFrames").followRedirects(true).getSync(url);
         };
         // the global brain
         if (!std::string_view(online::URL).empty() && !print.empty()) {
@@ -6488,7 +6488,7 @@ namespace online {
         std::filesystem::path dir = macroDir();
         OnlineMacro o = c.o;
         std::thread([levelId, o, dir] {
-            auto file = web::WebRequest().timeout(std::chrono::seconds(60)).userAgent("ClickBeforeFrames").followRedirects(true).getSync(o.url);
+            auto file = web::WebRequest().timeout(asp::Duration::fromSecs(60)).userAgent("ClickBeforeFrames").followRedirects(true).getSync(o.url);
             if (!file.ok()) {
                 queueInMainThread([o] { say("autoplay: couldn't download {} from {}", o.file, o.source); });
                 return;
@@ -6514,7 +6514,7 @@ namespace online {
             std::filesystem::create_directories(dir, ec);
             std::filesystem::remove(dir / fmt::format("{}.gdr", levelId), ec);
             std::filesystem::remove(dir / fmt::format("{}.gdr.json", levelId), ec);
-            (void)file::writeBinarySafe(dir / fmt::format("{}{}", levelId, json ? ".gdr.json" : ".gdr"), ByteSpan(data));
+            (void)file::writeBinarySafe(asp::fs::Path::fromStdPath(dir / fmt::format("{}{}", levelId, json ? ".gdr.json" : ".gdr")), ByteSpan(data));
             std::string credit = fmt::format("{} by {} ({}, GD {:.4f})", o.file, o.author.empty() ? m->author : o.author, o.source, m->gameVersion);
             Macro got = std::move(*m);
             queueInMainThread([got, credit, levelId, o] {
@@ -6547,7 +6547,7 @@ namespace online {
         }
         bool autoTps = Mod::get()->getSettingValue<bool>("macro-auto-tps");
         std::thread([levelId, print, tps, skip, forceTps, autoTps] {
-            auto res = web::WebRequest().timeout(std::chrono::seconds(15)).userAgent("ClickBeforeFrames")
+            auto res = web::WebRequest().timeout(asp::Duration::fromSecs(15)).userAgent("ClickBeforeFrames")
                 .getSync(fmt::format("{}/api/runs?level={}&hash={}&tps={}{}", online::URL, levelId, print, tps, skip.empty() ? "" : "&skip=" + skip));
             std::optional<Macro> got;
             int confirms = 0, replays = 0, fails = 0;
@@ -7278,7 +7278,7 @@ namespace online {
         autoplay.brainReported = true;
         std::string body = fmt::format(R"({{"id":"{}","key":"{}","ok":{}}})", online::id(), autoplay.brainKey, ok ? "true" : "false");
         std::thread([body] {
-            (void)web::WebRequest().timeout(std::chrono::seconds(15)).userAgent("ClickBeforeFrames").header("Content-Type", "application/json")
+            (void)web::WebRequest().timeout(asp::Duration::fromSecs(15)).userAgent("ClickBeforeFrames").header("Content-Type", "application/json")
                 .bodyString(body).postSync(std::string(online::URL) + "/api/runs/result");
         }).detach();
     }
@@ -7313,7 +7313,7 @@ namespace online {
         size_t n = autoplay.runFlips.size();
         size_t pos = autoplay.runFixes.size();
         std::thread([body, n, pos] {
-            auto res = web::WebRequest().timeout(std::chrono::seconds(20)).userAgent("ClickBeforeFrames").header("Content-Type", "application/json")
+            auto res = web::WebRequest().timeout(asp::Duration::fromSecs(20)).userAgent("ClickBeforeFrames").header("Content-Type", "application/json")
                 .bodyString(body).postSync(std::string(online::URL) + "/api/runs");
             bool confirmed = res.ok() && res.string().unwrapOr("").find("\"confirmed\":true") != std::string::npos;
             queueInMainThread([ok = res.ok(), confirmed, n, pos] {
@@ -12376,7 +12376,7 @@ private:
     void onMacros(CCObject*) {
         std::error_code ec;
         std::filesystem::create_directories(macroDir(), ec);
-        file::openFolder(macroDir());
+        file::openFolder(asp::fs::Path::fromStdPath(macroDir()));
     }
 
     void onTakeOver(CCObject*) {
@@ -13483,7 +13483,7 @@ namespace {
             };
             if (url.empty()) {
                 auto res = web::WebRequest()
-                    .timeout(std::chrono::seconds(15))
+                    .timeout(asp::Duration::fromSecs(15))
                     .userAgent("ClickBeforeFrames")
                     .header("Accept", "application/vnd.github+json")
                     .getSync(RELEASE_API);
@@ -13500,7 +13500,7 @@ namespace {
                 return fail("The latest release has no .geode file yet.");
             }
             auto file = web::WebRequest()
-                .timeout(std::chrono::seconds(120))
+                .timeout(asp::Duration::fromSecs(120))
                 .userAgent("ClickBeforeFrames")
                 .followRedirects(true)
                 .getSync(url);
@@ -13596,7 +13596,7 @@ namespace {
         std::thread([] {
             // test 90: the version uploaded on the CBF site's admin page comes first (GitHub otherwise)
             if (!std::string_view(online::URL).empty()) {
-                auto site = web::WebRequest().timeout(std::chrono::seconds(10)).userAgent("ClickBeforeFrames")
+                auto site = web::WebRequest().timeout(asp::Duration::fromSecs(10)).userAgent("ClickBeforeFrames")
                     .getSync(std::string(online::URL) + "/api/latest");
                 if (site.ok()) {
                     if (auto j = site.json(); j.isOk()) {
@@ -13628,7 +13628,7 @@ namespace {
                 }
             }
             auto res = web::WebRequest()
-                .timeout(std::chrono::seconds(10))
+                .timeout(asp::Duration::fromSecs(10))
                 .userAgent("ClickBeforeFrames")
                 .header("Accept", "application/vnd.github+json")
                 .getSync(RELEASE_API);
@@ -13651,7 +13651,7 @@ namespace {
             if (latest.isErr()) {
                 // a release named something else: the version inside its .geode decides
                 auto file = web::WebRequest()
-                    .timeout(std::chrono::seconds(60))
+                    .timeout(asp::Duration::fromSecs(60))
                     .userAgent("ClickBeforeFrames")
                     .followRedirects(true)
                     .getSync(url);
